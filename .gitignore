@@ -1,0 +1,14 @@
+dataset/
+dataloader/
+__pycache__/
+.conda/
+.vscode/
+/cgcnn
+
+/reproduced_models/*/results
+/reproduced_models/*/dataloader
+/reproduced_models/*/SchNet*
+
+wandb
+*.data
+*.log

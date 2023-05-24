@@ -1,0 +1,22 @@
+program: ../../script/intergrated_train.py
+method: bayes
+project: SchNet_Periodic_02
+metric:
+  goal: minimize
+  name: validation/mae_per_atom(eV/atom)
+parameters:
+  learning_rate:
+    min: 0.00001
+    max: 0.0001
+  prop:
+    values: ["gap pbe"]
+  weight_decay:
+    values: [0,0.00005,0.00001]
+  max_neighbors:
+    values: [12,18,24]
+  data_pdirname:
+    values: ["../../dataset/mp_megnet"]
+  mode:
+    values: ["n"]
+  GPU:
+    values: ["2"]
