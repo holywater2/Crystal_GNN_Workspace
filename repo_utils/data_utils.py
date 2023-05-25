@@ -65,7 +65,7 @@ class mp:
             pdirname = "../dataset/mp_megnet"
         path = pdirname + '/' + dirname
         print('[I] loading from',path)
-        os.makedirs(pdirname)
+        os.makedirs(pdirname,exist_ok=True)
         
         """If dirname already exist, exit the function"""
         if not os.path.exists(path):
@@ -139,7 +139,7 @@ class mp:
                 format=format,
                 sample_ratio=sample_ratio,
                 pdirname=pdirname,
-                seed=123)    
+                seed=seed)    
 
 
     def load(dirname="mp_megnet_all",
@@ -555,7 +555,7 @@ def dumpjson(data=[], filename=""):
 
 
 if __name__ == "__main__":
-    megnet = mp.download()
+    megnet = mp.load(down=True,downsave=True)
     mp.save(dataset=megnet)
     mp.save_with_sample(dataset=megnet,
                     dirname="mp_megnet_sample001",

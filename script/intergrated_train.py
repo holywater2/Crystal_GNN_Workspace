@@ -72,8 +72,8 @@ args['n_samples'] = None
         
 from models import train_schnet , train_alignn
 
-if config['model'] == 'SchNet' or 'schnet':
+if config['model'] == 'SchNet':
         train_schnet.train(args,config)
 
-if config['model'] == 'Alignn' or 'alignn':
+if config['model'] == 'Alignn':
         train_alignn.train(args,config)
