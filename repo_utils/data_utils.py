@@ -65,7 +65,7 @@ class mp:
             pdirname = "../dataset/mp_megnet"
         path = pdirname + '/' + dirname
         print('[I] loading from',path)
-        os.makedirs(pdirname, exist_ok=True)
+        os.makedirs(pdirname)
         
         """If dirname already exist, exit the function"""
         if not os.path.exists(path):
