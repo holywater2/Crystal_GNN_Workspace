@@ -1,8 +1,8 @@
 import sys
 import os
 import argparse
-sys.path.append('..')
-sys.path.append('/home/holywater2/2023/_Reproduce')
+sys.path.append('../..')
+# sys.path.append('/home/holywater2/2023/_Reproduce')
 
 import repo_utils.debbug_utils as deb
 
@@ -70,7 +70,10 @@ for arg in args.keys():
         config[arg] = args[arg]
 args['n_samples'] = None
         
-from models import train_schnet
+from models import train_schnet , train_alignn
 
-if config['model'] == 'SchNet':
+if config['model'] == 'SchNet' or 'schnet':
         train_schnet.train(args,config)
+
+if config['model'] == 'Alignn' or 'alignn':
+        train_alignn.train(args,config)
