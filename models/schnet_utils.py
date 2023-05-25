@@ -62,7 +62,8 @@ def run_an_eval_epoch(args, model, data_loader, loss_criterion):
             labels = labels.to(args["device"])
             prediction = regress(args, model, bg)
             eval_loss = (loss_criterion(prediction, labels)).mean()
-            num_atom = bg.batch_num_nodes().to(args["device"])
+            # num_atom = bg.batch_num_nodes().to(args["device"])
+            num_atom = bg.batch_num_nodes().reshape([-1,1]).to(args["device"])
             eval_meter.update(prediction, labels)
             eval_meter_per_atom.update(prediction/num_atom, labels/num_atom)
         total_score = np.mean(eval_meter.compute_metric(args["metric_name"]))
@@ -83,12 +84,14 @@ def run_an_fianl_eval(args, model, data_loader, loss_criterion,
             labels = labels.to(args["device"])
             prediction = regress(args, model, bg)
             eval_loss = (loss_criterion(prediction, labels)).mean()
-            num_atom = bg.batch_num_nodes().to(args["device"])
+            num_atom = bg.batch_num_nodes().reshape([-1,1]).to(args["device"])
             eval_meter.update(prediction, labels)
             eval_meter_per_atom.update(prediction/num_atom, labels/num_atom)
         total_score = np.mean(eval_meter.compute_metric(args["metric_name"]))
         total_score_per_atom = np.mean(eval_meter_per_atom.compute_metric(args["metric_name"]))
-        
+        print(prediction)
+        print(num_atom)
+        print(prediction/num_atom)        
     if save:
         filename1 = filename + 'result.csv'
         filename2 = filename + 'result_per_atom.csv'
@@ -101,14 +104,14 @@ def run_an_fianl_eval(args, model, data_loader, loss_criterion,
         with open(filename1, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow([args["metric_name"],"loss"])
-            writer.writerow([total_score, eval_loss[0]])
+            writer.writerow([total_score, eval_loss])
             writer.writerow(["y_true","y_pred"])
             for row in savedata:
                 writer.writerow(row)
         with open(filename2, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow([args["metric_name"],"loss"])
-            writer.writerow([total_score_per_atom, eval_loss[0]])
+            writer.writerow([total_score_per_atom, eval_loss])
             writer.writerow(["y_true","y_pred"])
             for row in savedata_pa:
                 writer.writerow(row)

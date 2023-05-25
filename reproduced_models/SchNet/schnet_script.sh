@@ -9,9 +9,13 @@ python3 ../../script/intergrated_train.py \
 --n_epochs=500 \
 --batch_size=64 \
 --data_pdirname="../../dataset/mp_megnet" \
---GPU="4" \
+--GPU="1" \
 --save_loader=True \
 --loader_dirname="dataloader/mp_megent_dataloader" \
 --mode="n" \
+--n_train=60000 \
+--n_val=5000 \
+--n_test=4239 \
+--distance_cutoff=5.0 \
 # --data_dirname="mp_megnet_sample001" \
 # --wandb_disabled=True \

@@ -43,6 +43,8 @@ def train(args, config):
                 + config['dataset'] + '_' \
                 + config['prop'] + '_' \
                 + datestr
+    if args["mode"] == "sample":
+        output_dir = output_dir + "_sample"
     print("[I] Output directory is",output_dir)
     os.makedirs(output_dir)
     
@@ -95,15 +97,24 @@ def train(args, config):
                                 save_dataloader=config['save_loader'],
                                 output_dir=output_dir,
                                 line_graph=False,
+                                n_train=config["n_train"],
+                                n_val=config["n_val"],
+                                n_test=config["n_test"],
                                 max_neighbors=config["max_neighbors"],
                                 workers=config["num_workers"],
                                 split_seed=config["random_seed"],
                                 cutoff=config["radial_cutoff"],
                                 id_tag="id")
-
-    config['n_train']   = len(train_loader.dataset)
-    config['n_val']     = len(val_loader.dataset)
-    config['n_test']    = len(test_loader.dataset)
+    wandb.config.update({'n_train':len(train_loader.dataset),
+                         'n_val':len(val_loader.dataset),
+                         'n_test':len(test_loader.dataset)}
+                        ,allow_val_change=True)
+    # if config['n_train'] is None:
+    #     config['n_train']   = len(train_loader.dataset)
+    # if config['n_val'] is None:
+    #     config['n_val']     = len(val_loader.dataset)
+    # if config['n_test'] is None:
+    #     config['n_test']    = len(test_loader.dataset)
     config['n_samples'] = config['n_test'] + config['n_val'] + config['n_train']
 
     print(config)
@@ -122,7 +133,7 @@ def train(args, config):
                             classifier_hidden_feats=64,
                             n_tasks=1,
                             num_node_types=100,
-                            cutoff=30.,
+                            cutoff=config['distance_cutoff'],
                             gap=0.1,
                             predictor_hidden_feats=64)
 
@@ -133,7 +144,7 @@ def train(args, config):
     
     print(config['n_epochs'],type(config['n_epochs']))
     scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer,
-                                                    max_lr=0.0001,
+                                                    max_lr=0.0005,
                                                     steps_per_epoch=len(train_loader),
                                                     epochs=config['n_epochs'])
 
@@ -189,12 +200,17 @@ def train(args, config):
         
         wandb.log({"global_step":epoch+1})
         
-
-    run_an_fianl_eval(args, model, train_loader,loss_fn,filename=output_dir+"/train_")
-    run_an_fianl_eval(args, model, val_loader,loss_fn,filename=output_dir+"/val_")
+    save_result = True
+    run_an_fianl_eval(args, model, train_loader,loss_fn,filename=output_dir+"/train_",save=save_result)
+    run_an_fianl_eval(args, model, val_loader,loss_fn,filename=output_dir+"/val_",save=save_result)
     test_score, test_score_per_atom, test_loss = \
-        run_an_fianl_eval(args, model, test_loader,loss_fn, filename=output_dir+"/test_")
-        
+        run_an_fianl_eval(args, model, test_loader,loss_fn, filename=output_dir+"/test_",save=save_result)
+    
+    print('epoch {:d}/{:d}, test  {} {:.4f}, test  {}/atom {:.4f}, , test  loss {:.4f}'.format(
+        epoch + 1, args["n_epochs"],
+        args["metric_name"], test_score,
+        args["metric_name"], test_score_per_atom,
+        test_loss))
     wandb.log({"final_test/mae(eV)":test_score,
                "final_test/mae_per_atom(eV/atom)":test_score_per_atom,
                "final_test/loss":test_loss})

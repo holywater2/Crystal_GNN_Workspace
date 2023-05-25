@@ -14,7 +14,7 @@ parser.add_argument('--project',            type=str,   default="schnet_periodic
 parser.add_argument('--model',               type=str,   default="SchNet") #"e_form", "gap pbe", "bulk modulus","shear modulus", "elastic anisotropy"
 
 # Hyperparameters
-parser.add_argument('--batch_size',         type=int,   default=48)
+parser.add_argument('--batch_size',         type=int,   default=64)
 parser.add_argument('--learning_rate',      type=float, default=0.001)
 parser.add_argument('--weight_decay',       type=float, default=0)
 parser.add_argument('--prop',               type=str,   default="e_form") #"e_form", "gap pbe", "bulk modulus","shear modulus", "elastic anisotropy"
@@ -23,7 +23,9 @@ parser.add_argument('--n_epochs',           type=int,   default=500) # default 3
 parser.add_argument('--radial_cutoff',      type=float, default=5.0) # default 300
 parser.add_argument('--max_neighbors',      type=int,   default=12) # default 300
 
-parser.add_argument('--n_layers',           type=int,   default=6)
+parser.add_argument('--n_layers',           type=int,     default=6)
+parser.add_argument('--distance_cutoff',    type=float,   default=5.0)
+
 
 # Dataset
 parser.add_argument('--dataset',            type=str,   default="megnet")
@@ -35,9 +37,9 @@ parser.add_argument('--save_loader',        type=bool,  default=False)
 
 parser.add_argument('--random_seed',        type=int,   default=123)  # default random
 
-# parser.add_argument('--n_train',            type=int,   default=None)  # default 60000
-# parser.add_argument('--n_val',              type=int,   default=None)  # default 5000
-# parser.add_argument('--n_test',             type=int,   default=None)  # default 4239
+parser.add_argument('--n_train',            type=int,   default=None)  # default 60000
+parser.add_argument('--n_val',              type=int,   default=None)  # default 5000
+parser.add_argument('--n_test',             type=int,   default=None)  # default 4239
 
 # Settings
 parser.add_argument('--num_workers',        type=int,   default=0)
