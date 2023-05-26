@@ -11,6 +11,7 @@ python3 ../../script/intergrated_train.py \
 --data_pdirname="../../dataset/mp_megnet" \
 --GPU="7" \
 --mode="n" \
+--num_workers=8 \
 # --save_loader=True \
 # --loader_dirname="dataloader/mp_megent_dataloader" \
 # --data_dirname="mp_megnet_sample001" \

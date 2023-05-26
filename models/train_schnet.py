@@ -18,6 +18,8 @@ from alignn.data import get_train_val_loaders
 
 
 def train(args, config):
+    torch.set_num_threads(8) # Is it needed? 없으면 CPU 사용량 폭주함
+    
     wandb_mode = None
     if args['wandb_disabled']:
         wandb_mode = "disabled"
@@ -175,6 +177,7 @@ def train(args, config):
 
     model.to(args["device"])
     total_param = count_parameters(model)
+    torch.set_num_threads(24)
     wandb.log({"total params":total_param},commit=False)
 
     for epoch in range(config["n_epochs"]):
