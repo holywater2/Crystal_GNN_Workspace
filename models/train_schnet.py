@@ -144,9 +144,32 @@ def train(args, config):
     
     print(config['n_epochs'],type(config['n_epochs']))
     scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer,
-                                                    max_lr=0.0005,
+                                                    max_lr=config["learning_rate"],
                                                     steps_per_epoch=len(train_loader),
                                                     epochs=config['n_epochs'])
+
+    # if config.scheduler == "none":
+    #     # always return multiplier of 1 (i.e. do nothing)
+    #     scheduler = torch.optim.lr_scheduler.LambdaLR(
+    #         optimizer, lambda epoch: 1.0
+    #     )
+
+    # elif config.scheduler == "onecycle":
+    #     steps_per_epoch = len(train_loader)
+    #     # pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
+    #     scheduler = torch.optim.lr_scheduler.OneCycleLR(
+    #         optimizer,
+    #         max_lr=config.learning_rate,
+    #         epochs=config.epochs,
+    #         steps_per_epoch=steps_per_epoch,
+    #         # pct_start=pct_start,
+    #         pct_start=0.3,
+    #     )
+    # elif config.scheduler == "step":
+    #     # pct_start = config.warmup_steps / (config.epochs * steps_per_epoch)
+    #     scheduler = torch.optim.lr_scheduler.StepLR(
+    #         optimizer,
+    #     )
 
     # stopper = EarlyStopping(mode="lower", patience=10)
 
