@@ -35,7 +35,7 @@ parser.add_argument('--data_dirname',       type=str,   default=None)
 parser.add_argument('--loader_dirname',     type=str,   default=None)
 parser.add_argument('--save_loader',        type=bool,  default=False)
 
-parser.add_argument('--random_seed',        type=int,   default=123)  # default random
+parser.add_argument('--random_seed',        type=int,   default=None)  # default random
 
 parser.add_argument('--n_train',            type=int,   default=None)  # default 60000
 parser.add_argument('--n_val',              type=int,   default=None)  # default 5000

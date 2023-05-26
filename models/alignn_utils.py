@@ -329,7 +329,7 @@ def train_dgl(
         net = _model.get(config.model.name)(config.model)
     else:
         net = model
-    print("여긴가?")
+    # print("여긴가?")
     net.to(device)
     # group parameters to skip weight decay for bias and batchnorm
     params = group_decay(net)
