@@ -25,6 +25,7 @@ parser.add_argument('--max_neighbors',      type=int,   default=12) # default 30
 
 parser.add_argument('--n_layers',           type=int,     default=6)
 parser.add_argument('--distance_cutoff',    type=float,   default=5.0)
+parser.add_argument('--per_atom',           type=bool,    default=True)
 
 
 # Dataset
@@ -42,7 +43,7 @@ parser.add_argument('--n_val',              type=int,   default=None)  # default
 parser.add_argument('--n_test',             type=int,   default=None)  # default 4239
 
 # Settings
-parser.add_argument('--num_workers',        type=int,   default=0)
+parser.add_argument('--num_workers',        type=int,   default=8)
 parser.add_argument('--metric_name',        type=str,   default="mae")
 parser.add_argument('--mode',               type=str,   default="sample")
 

@@ -5,12 +5,12 @@ python3 ../../script/intergrated_train.py \
 --project="Alignn_02" \
 --model="Alignn" \
 --weight_decay=0.00001 \
---learning_rate=0.0005 \
+--learning_rate=0.001 \
 --batch_size=64 \
 --mode="n" \
---data_dirname="mp_megnet_sample001" \
 --data_pdirname="../../dataset/mp_megnet" \
---GPU="5" \
+--GPU="3" \
 --n_epochs=300 \
 --det="y" \
+# --data_dirname="mp_megnet_sample001" \
 # --wandb_disabled=True \

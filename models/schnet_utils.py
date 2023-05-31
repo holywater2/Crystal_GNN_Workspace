@@ -40,13 +40,18 @@ def run_a_train_epoch(args,epoch, model, data_loader,
         labels = labels.reshape([-1,1])
         labels = labels.to(args["device"])
         prediction = regress(args, model, bg)
-        loss = (loss_criterion(prediction, labels)).mean()
+        num_atom = bg.batch_num_nodes().reshape([-1,1]).to(args["device"])
+        
+        if args["per_atom"]:
+            loss = (loss_criterion(prediction/num_atom, labels/num_atom)).mean()
+        else:
+            loss = (loss_criterion(prediction, labels)).mean()
+
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         scheduler.step()
         
-        num_atom = bg.batch_num_nodes().to(args["device"])
         train_meter.update(prediction, labels)
         train_meter_per_atom.update(prediction/num_atom, labels/num_atom)
         epoch_loss += loss.item() * bg.batch_size
@@ -69,9 +74,12 @@ def run_an_eval_epoch(args, model, data_loader, loss_criterion):
             labels = labels.reshape([-1,1])
             labels = labels.to(args["device"])
             prediction = regress(args, model, bg)
-            eval_loss = (loss_criterion(prediction, labels)).mean()
-            # num_atom = bg.batch_num_nodes().to(args["device"])
             num_atom = bg.batch_num_nodes().reshape([-1,1]).to(args["device"])
+            if args["per_atom"]:
+                eval_loss = (loss_criterion(prediction/num_atom, labels/num_atom)).mean()
+            else:
+                eval_loss = (loss_criterion(prediction, labels)).mean()
+
             eval_meter.update(prediction, labels)
             eval_meter_per_atom.update(prediction/num_atom, labels/num_atom)
             epoch_loss += eval_loss.item() * bg.batch_size
@@ -96,9 +104,13 @@ def run_an_fianl_eval(args, model, data_loader, loss_criterion,
             labels = labels.to(args["device"])
             
             prediction = regress(args, model, bg)
-            eval_loss = (loss_criterion(prediction, labels)).mean()
-
+            
             num_atom = bg.batch_num_nodes().reshape([-1,1]).to(args["device"])
+            if args["per_atom"]:
+                eval_loss = (loss_criterion(prediction/num_atom, labels/num_atom)).mean()
+            else:
+                eval_loss = (loss_criterion(prediction, labels)).mean()
+
             eval_meter.update(prediction, labels)
             eval_meter_per_atom.update(prediction/num_atom, labels/num_atom)
             epoch_loss += eval_loss.item() * bg.batch_size
