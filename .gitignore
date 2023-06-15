@@ -9,6 +9,9 @@ __pycache__/
 /reproduced_models/*/results
 /reproduced_models/*/dataloader
 /reproduced_models/*/SchNet*
+/test_models
+
+
 
 wandb
 *.data

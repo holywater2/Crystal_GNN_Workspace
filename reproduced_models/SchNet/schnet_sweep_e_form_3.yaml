@@ -21,4 +21,4 @@ parameters:
   GPU:
     values: ["6"]
   distance_cutoff:
-    values: ["5.0"]
+    values: ["10.0"]

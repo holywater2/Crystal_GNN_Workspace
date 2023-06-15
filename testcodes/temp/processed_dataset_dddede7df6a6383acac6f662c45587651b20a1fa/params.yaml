@@ -1,0 +1,12 @@
+ase_args: {}
+dtype: torch.float32
+extra_fixed_fields:
+  r_max: 4.5
+file_name: temp/atoms.xyz
+force_fixed_keys: !!set {}
+include_frames: null
+include_keys: null
+key_mapping: null
+nequip_version: 0.5.6
+root: temp
+url: null

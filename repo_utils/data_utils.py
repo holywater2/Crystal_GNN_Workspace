@@ -1,32 +1,59 @@
 
+# from typing import Dict, List, Optional, Set, Tuple
+# from jarvis.core.graphs import Graph, StructureDataset
+# from sklearn.pipeline import Pipeline
+# from sklearn.decomposition import PCA  # ,KernelPCA
 
-from __future__ import print_function, division
 
+from sklearn.preprocessing import StandardScaler
+
+import math
 import csv
 import functools
 import json
-import os
-import random
+import os, sys
 import warnings
-import csv
+import random
+import torch
+import dgl
+import pandas as pd
+import pickle as pk
+import numpy as np
+
 from tqdm import tqdm
 
-import numpy as np
-import torch
 from pymatgen.core.structure import Structure
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataloader import default_collate
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.data.dataset import random_split
 
-
 from jarvis.db.figshare import data
+from jarvis.db.figshare import data as jdata
 from jarvis.db.jsonutils import loadjson, dumpjson
 from jarvis.core.atoms import Atoms
+# from jarvis.core.graphs import Graph
+from alignn.graphs import Graph, StructureDataset
+
+
+from typing import Optional
+from pathlib import Path
+
+sys.path.append('.')
+from repo_utils.sample_data import sample_data
+
+tqdm.pandas()
 
 #'e_hull', 'gap pbe', 'mu_b', 'elastic anisotropy', 'bulk modulus', 'shear modulus', 'e_form'
 
 class mp:
+    sample_data = sample_data
+    def sample_data_as_atoms():
+        return Atoms.from_dict(sample_data["atoms"])
+
+    pdirname="/home/holywater2/2023/_Reproduce/dataset/mp_megnet"
+    dirname="mp_megnet_sample001"
+
     def download():
         """
         Download the periodic (crystal) dataset of the Materials Project
@@ -191,7 +218,7 @@ class mp:
                        format="json",
                        pdirname=pdirname)
         
-    def load_json_sample(dirname="mp_megnet_sample",
+    def load_json_sample(dirname="mp_megnet_sample01",
                          down=True,
                          downsave=True,
                          pdirname=None):
@@ -201,7 +228,12 @@ class mp:
                        downsave=downsave,
                        format="json",
                        pdirname=pdirname)
+        
+    def load_sample01():
+        return mp.load(pdirname="../_Reproduce/dataset/mp_megnet",dirname="mp_megnet_sample001")
     
+    def load_sample001():
+        return mp.load(pdirname="../_Reproduce/dataset/mp_megnet",dirname="mp_megnet_sample001")
     
 def loadjson(filename=""):
     """Provide helper function to load a json file."""
@@ -217,342 +249,590 @@ def dumpjson(data=[], filename=""):
     f.write(json.dumps(data))
     f.close()
 
-# def get_train_val_test_loader(dataset, collate_fn=default_collate,
-#                               batch_size=64, train_ratio=None,
-#                               val_ratio=0.1, test_ratio=0.1, return_test=False,
-#                               num_workers=1, pin_memory=False, **kwargs):
-#     """
-#     Utility function for dividing a dataset to train, val, test datasets.
+"""Jarvis-dgl data loaders and DGLGraph utilities."""
 
-#     !!! The dataset needs to be shuffled before using the function !!!
+def load_graphs(
+    dataset=[],
+    name: str = "dft_3d",
+    neighbor_strategy: str = "k-nearest",
+    cutoff: float = 8,
+    max_neighbors: int = 12,
+    cachedir: Optional[Path] = None,
+    use_canonize: bool = False,
+    supercell_dim: list = [1,1,1]
+):
+    """Construct crystal graphs.
 
-#     Parameters
-#     ----------
-#     dataset: torch.utils.data.Dataset
-#       The full dataset to be divided.
-#     collate_fn: torch.utils.data.DataLoader
-#     batch_size: int
-#     train_ratio: float
-#     val_ratio: float
-#     test_ratio: float
-#     return_test: bool
-#       Whether to return the test dataset loader. If False, the last test_size
-#       data will be hidden.
-#     num_workers: int
-#     pin_memory: bool
+    Load only atomic number node features
+    and bond displacement vector edge features.
 
-#     Returns
-#     -------
-#     train_loader: torch.utils.data.DataLoader
-#       DataLoader that random samples the training data.
-#     val_loader: torch.utils.data.DataLoader
-#       DataLoader that random samples the validation data.
-#     (test_loader): torch.utils.data.DataLoader
-#       DataLoader that random samples the test data, returns if
-#         return_test=True.
-#     """
-#     total_size = len(dataset)
-#     if kwargs['train_size'] is None:
-#         if train_ratio is None:
-#             assert val_ratio + test_ratio < 1
-#             train_ratio = 1 - val_ratio - test_ratio
-#             print(f'[Warning] train_ratio is None, using 1 - val_ratio - '
-#                   f'test_ratio = {train_ratio} as training data.')
-#         else:
-#             assert train_ratio + val_ratio + test_ratio <= 1
-#     indices = list(range(total_size))
-#     if kwargs['train_size']:
-#         train_size = kwargs['train_size']
-#     else:
-#         train_size = int(train_ratio * total_size)
-#     if kwargs['test_size']:
-#         test_size = kwargs['test_size']
-#     else:
-#         test_size = int(test_ratio * total_size)
-#     if kwargs['val_size']:
-#         valid_size = kwargs['val_size']
-#     else:
-#         valid_size = int(val_ratio * total_size)
-#     train_sampler = SubsetRandomSampler(indices[:train_size])
-#     val_sampler = SubsetRandomSampler(
-#         indices[-(valid_size + test_size):-test_size])
-#     if return_test:
-#         test_sampler = SubsetRandomSampler(indices[-test_size:])
-#     train_loader = DataLoader(dataset, batch_size=batch_size,
-#                               sampler=train_sampler,
-#                               num_workers=num_workers,
-#                               collate_fn=collate_fn, pin_memory=pin_memory)
-#     val_loader = DataLoader(dataset, batch_size=batch_size,
-#                             sampler=val_sampler,
-#                             num_workers=num_workers,
-#                             collate_fn=collate_fn, pin_memory=pin_memory)
-#     if return_test:
-#         test_loader = DataLoader(dataset, batch_size=batch_size,
-#                                  sampler=test_sampler,
-#                                  num_workers=num_workers,
-#                                  collate_fn=collate_fn, pin_memory=pin_memory)
-#     if return_test:
-#         return train_loader, val_loader, test_loader
-#     else:
-#         return train_loader, val_loader
+    Resulting graphs have scheme e.g.
+    ```
+    Graph(num_nodes=12, num_edges=156,
+        ndata_schemes={'atom_features': Scheme(shape=(1,)}
+        edata_schemes={'r': Scheme(shape=(3,)})
+    ```
+    """
 
+    def atoms_to_graph(atoms):
+        """Convert structure dict to DGLGraph."""
+        structure = Atoms.from_dict(atoms)
+        if supercell_dim is None or supercell_dim != [1,1,1]:
+            structure = structure.make_supercell(supercell_dim)
+        return Graph.atom_dgl_multigraph(
+            structure,
+            cutoff=cutoff,
+            atom_features="atomic_number",
+            max_neighbors=max_neighbors,
+            compute_line_graph=False,
+            use_canonize=use_canonize,
+        )
 
-# def collate_pool(dataset_list):
-#     """
-#     Collate a list of data and return a batch for predicting crystal
-#     properties.
+    if cachedir is not None:
+        cachefile = cachedir / f"{name}-{neighbor_strategy}.bin"
+    else:
+        cachefile = None
 
-#     Parameters
-#     ----------
+    if cachefile is not None and cachefile.is_file():
+        graphs, labels = dgl.load_graphs(str(cachefile))
+    else:
+        df = pd.DataFrame(dataset)
 
-#     dataset_list: list of tuples for each data point.
-#       (atom_fea, nbr_fea, nbr_fea_idx, target)
+        graphs = df["atoms"].progress_apply(atoms_to_graph).values
+        if cachefile is not None:
+            dgl.save_graphs(str(cachefile), graphs.tolist())
 
-#       atom_fea: torch.Tensor shape (n_i, atom_fea_len)
-#       nbr_fea: torch.Tensor shape (n_i, M, nbr_fea_len)
-#       nbr_fea_idx: torch.LongTensor shape (n_i, M)
-#       target: torch.Tensor shape (1, )
-#       cif_id: str or int
+    return graphs
 
-#     Returns
-#     -------
-#     N = sum(n_i); N0 = sum(i)
+def load_graphs_supercell(
+    dataset=[],
+    name: str = "dft_3d",
+    neighbor_strategy: str = "k-nearest",
+    cutoff: float = 8,
+    max_neighbors: int = 12,
+    cachedir: Optional[Path] = None,
+    use_canonize: bool = False,
+    supercell_dim: list = [1,1,1]
+):
+    """Construct crystal graphs.
 
-#     batch_atom_fea: torch.Tensor shape (N, orig_atom_fea_len)
-#       Atom features from atom type
-#     batch_nbr_fea: torch.Tensor shape (N, M, nbr_fea_len)
-#       Bond features of each atom's M neighbors
-#     batch_nbr_fea_idx: torch.LongTensor shape (N, M)
-#       Indices of M neighbors of each atom
-#     crystal_atom_idx: list of torch.LongTensor of length N0
-#       Mapping from the crystal idx to atom idx
-#     target: torch.Tensor shape (N, 1)
-#       Target value for prediction
-#     batch_cif_ids: list
-#     """
-#     batch_atom_fea, batch_nbr_fea, batch_nbr_fea_idx = [], [], []
-#     crystal_atom_idx, batch_target = [], []
-#     batch_cif_ids = []
-#     base_idx = 0
-#     for i, ((atom_fea, nbr_fea, nbr_fea_idx), target, cif_id)\
-#             in enumerate(dataset_list):
-#         n_i = atom_fea.shape[0]  # number of atoms for this crystal
-#         batch_atom_fea.append(atom_fea)
-#         batch_nbr_fea.append(nbr_fea)
-#         batch_nbr_fea_idx.append(nbr_fea_idx+base_idx)
-#         new_idx = torch.LongTensor(np.arange(n_i)+base_idx)
-#         crystal_atom_idx.append(new_idx)
-#         batch_target.append(target)
-#         batch_cif_ids.append(cif_id)
-#         base_idx += n_i
-#     return (torch.cat(batch_atom_fea, dim=0),
-#             torch.cat(batch_nbr_fea, dim=0),
-#             torch.cat(batch_nbr_fea_idx, dim=0),
-#             crystal_atom_idx),\
-#         torch.stack(batch_target, dim=0),\
-#         batch_cif_ids
+    Load only atomic number node features
+    and bond displacement vector edge features.
 
+    Resulting graphs have scheme e.g.
+    ```
+    Graph(num_nodes=12, num_edges=156,
+        ndata_schemes={'atom_features': Scheme(shape=(1,)}
+        edata_schemes={'r': Scheme(shape=(3,)})
+    ```
+    """
 
-# class GaussianDistance(object):
-#     """
-#     Expands the distance by Gaussian basis.
+    def atoms_to_graph(atoms):
+        """Convert structure dict to DGLGraph."""
+        structure = Atoms.from_dict(atoms).make_supercell(supercell_dim)
+        return Graph.atom_dgl_multigraph(
+            structure,
+            cutoff=cutoff,
+            atom_features="atomic_number",
+            max_neighbors=max_neighbors,
+            compute_line_graph=False,
+            use_canonize=use_canonize,
+        )
 
-#     Unit: angstrom
-#     """
-#     def __init__(self, dmin, dmax, step, var=None):
-#         """
-#         Parameters
-#         ----------
+    if cachedir is not None:
+        cachefile = cachedir / f"{name}-{neighbor_strategy}.bin"
+    else:
+        cachefile = None
 
-#         dmin: float
-#           Minimum interatomic distance
-#         dmax: float
-#           Maximum interatomic distance
-#         step: float
-#           Step size for the Gaussian filter
-#         """
-#         assert dmin < dmax
-#         assert dmax - dmin > step
-#         self.filter = np.arange(dmin, dmax+step, step)
-#         if var is None:
-#             var = step
-#         self.var = var
+    if cachefile is not None and cachefile.is_file():
+        graphs, labels = dgl.load_graphs(str(cachefile))
+    else:
+        df = pd.DataFrame(dataset)
 
-#     def expand(self, distances):
-#         """
-#         Apply Gaussian disntance filter to a numpy distance array
+        graphs = df["atoms"].progress_apply(atoms_to_graph).values
+        if cachefile is not None:
+            dgl.save_graphs(str(cachefile), graphs.tolist())
 
-#         Parameters
-#         ----------
+    return graphs
 
-#         distance: np.array shape n-d array
-#           A distance matrix of any shape
+# np.mean(mean_absolute_deviation(x,axis=0))
+def mean_absolute_deviation(data, axis=None):
+    """Get Mean absolute deviation."""
+    return np.mean(np.absolute(data - np.mean(data, axis)), axis)
 
-#         Returns
-#         -------
-#         expanded_distance: shape (n+1)-d array
-#           Expanded distance matrix with the last dimension of length
-#           len(self.filter)
-#         """
-#         return np.exp(-(distances[..., np.newaxis] - self.filter)**2 /
-#                       self.var**2)
+def get_id_train_val_test(
+    total_size=1000,
+    split_seed=123,
+    train_ratio=None,
+    val_ratio=0.1,
+    test_ratio=0.1,
+    n_train=None,
+    n_test=None,
+    n_val=None,
+    keep_data_order=False,
+):
+    """Get train, val, test IDs."""
+    if (
+        train_ratio is None
+        and val_ratio is not None
+        and test_ratio is not None
+    ):
+        if train_ratio is None:
+            assert val_ratio + test_ratio < 1
+            train_ratio = 1 - val_ratio - test_ratio
+            print("Using rest of the dataset except the test and val sets.")
+        else:
+            assert train_ratio + val_ratio + test_ratio <= 1
+    # indices = list(range(total_size))
+    if n_train is None:
+        n_train = int(train_ratio * total_size)
+    if n_test is None:
+        n_test = int(test_ratio * total_size)
+    if n_val is None:
+        n_val = int(val_ratio * total_size)
+    ids = list(np.arange(total_size))
+    if not keep_data_order:
+        random.seed(split_seed)
+        random.shuffle(ids)
+    # np.random.shuffle(ids)
+    if n_train + n_val + n_test > total_size:
+        raise ValueError(
+            "Check total number of samples.",
+            n_train + n_val + n_test,
+            ">",
+            total_size,
+        )
+
+    # shuffle consistently with https://github.com/txie-93/cgcnn/data.py
+    # i.e. shuffle the index in place with standard library random.shuffle
+    # first obtain only valid indices
+
+    # test_size = round(N * 0.2)
+
+    # full train/val test split
+    # ids = ids[::-1]
+    id_train = ids[:n_train]
+    id_val = ids[-(n_val + n_test) : -n_test]  # noqa:E203
+    id_test = ids[-n_test:]
+    return id_train, id_val, id_test
 
 
-# class AtomInitializer(object):
-#     """
-#     Base class for intializing the vector representation for atoms.
+def get_torch_dataset(
+    dataset=[],
+    id_tag="jid",
+    target="",
+    target_atomwise="",
+    target_grad="",
+    target_stress="",
+    neighbor_strategy="",
+    atom_features="",
+    use_canonize="",
+    name="",
+    line_graph="",
+    cutoff=8.0,
+    max_neighbors=12,
+    classification=False,
+    output_dir=".",
+    tmp_name="dataset",
+    supercell_dim = [1,1,1]
+):
+    """Get Torch Dataset."""
+    df = pd.DataFrame(dataset)
+    # df['natoms']=df['atoms'].apply(lambda x: len(x['elements']))
+    # print(" data df", df)
+    vals = np.array([ii[target] for ii in dataset])  # df[target].values
+    print("data range", np.max(vals), np.min(vals))
+    f = open(os.path.join(output_dir, tmp_name + "_data_range"), "w")
+    line = "Max=" + str(np.max(vals)) + "\n"
+    f.write(line)
+    line = "Min=" + str(np.min(vals)) + "\n"
+    f.write(line)
+    f.close()
 
-#     !!! Use one AtomInitializer per dataset !!!
-#     """
-#     def __init__(self, atom_types):
-#         self.atom_types = set(atom_types)
-#         self._embedding = {}
-
-#     def get_atom_fea(self, atom_type):
-#         assert atom_type in self.atom_types
-#         return self._embedding[atom_type]
-
-#     def load_state_dict(self, state_dict):
-#         self._embedding = state_dict
-#         self.atom_types = set(self._embedding.keys())
-#         self._decodedict = {idx: atom_type for atom_type, idx in
-#                             self._embedding.items()}
-
-#     def state_dict(self):
-#         return self._embedding
-
-#     def decode(self, idx):
-#         if not hasattr(self, '_decodedict'):
-#             self._decodedict = {idx: atom_type for atom_type, idx in
-#                                 self._embedding.items()}
-#         return self._decodedict[idx]
+    graphs = load_graphs(
+        df,
+        name=name,
+        neighbor_strategy=neighbor_strategy,
+        use_canonize=use_canonize,
+        cutoff=cutoff,
+        max_neighbors=max_neighbors,
+        supercell_dim=supercell_dim
+    )
+    data = StructureDataset(
+        df,
+        graphs,
+        target=target,
+        target_atomwise=target_atomwise,
+        target_grad=target_grad,
+        target_stress=target_stress,
+        atom_features=atom_features,
+        line_graph=line_graph,
+        id_tag=id_tag,
+        classification=classification,
+    )
+    return data
 
 
-# class AtomCustomJSONInitializer(AtomInitializer):
-#     """
-#     Initialize atom feature vectors using a JSON file, which is a python
-#     dictionary mapping from element number to a list representing the
-#     feature vector of the element.
+def get_train_val_loaders(
+    dataset: str = "dft_3d",
+    dataset_array=[],
+    target: str = "formation_energy_peratom",
+    target_atomwise: str = "",
+    target_grad: str = "",
+    target_stress: str = "",
+    atom_features: str = "cgcnn",
+    neighbor_strategy: str = "k-nearest",
+    n_train=None,
+    n_val=None,
+    n_test=None,
+    train_ratio=None,
+    val_ratio=0.1,
+    test_ratio=0.1,
+    batch_size: int = 5,
+    standardize: bool = False,
+    line_graph: bool = True,
+    split_seed: int = 123,
+    workers: int = 0,
+    pin_memory: bool = True,
+    save_dataloader: bool = False,
+    filename: str = "sample",
+    id_tag: str = "jid",
+    use_canonize: bool = False,
+    cutoff: float = 8.0,
+    max_neighbors: int = 12,
+    classification_threshold: Optional[float] = None,
+    target_multiplication_factor: Optional[float] = None,
+    standard_scalar_and_pca=False,
+    keep_data_order=False,
+    output_features=1,
+    output_dir=None,
+    supercell_dim: list=[1,1,1]
+):
+    """Help function to set up JARVIS train and val dataloaders."""
+    train_sample = filename + "_train.data"
+    val_sample = filename + "_val.data"
+    test_sample = filename + "_test.data"
+    # print ('output_dir data',output_dir)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    if (
+        os.path.exists(train_sample)
+        and os.path.exists(val_sample)
+        and os.path.exists(test_sample)
+        and save_dataloader
+    ):
+        print("Loading from saved file...")
+        print("Make sure all the DataLoader params are same.")
+        print("This module is made for debugging only.")
+        train_loader = torch.load(train_sample)
+        val_loader = torch.load(val_sample)
+        test_loader = torch.load(test_sample)
+        if train_loader.pin_memory != pin_memory:
+            train_loader.pin_memory = pin_memory
+        if test_loader.pin_memory != pin_memory:
+            test_loader.pin_memory = pin_memory
+        if val_loader.pin_memory != pin_memory:
+            val_loader.pin_memory = pin_memory
+        if train_loader.num_workers != workers:
+            train_loader.num_workers = workers
+        if test_loader.num_workers != workers:
+            test_loader.num_workers = workers
+        if val_loader.num_workers != workers:
+            val_loader.num_workers = workers
+        # print("train", len(train_loader.dataset))
+        # print("val", len(val_loader.dataset))
+        # print("test", len(test_loader.dataset))
+    else:
 
-#     Parameters
-#     ----------
+        if not dataset_array:
+            d = jdata(dataset)
+        else:
+            d = dataset_array
 
-#     elem_embedding_file: str
-#         The path to the .json file
-#     """
-#     def __init__(self, elem_embedding_file):
-#         with open(elem_embedding_file) as f:
-#             elem_embedding = json.load(f)
-#         elem_embedding = {int(key): value for key, value
-#                           in elem_embedding.items()}
-#         atom_types = set(elem_embedding.keys())
-#         super(AtomCustomJSONInitializer, self).__init__(atom_types)
-#         for key, value in elem_embedding.items():
-#             self._embedding[key] = np.array(value, dtype=float)
+            # for ii, i in enumerate(pc_y):
+            #    d[ii][target] = pc_y[ii].tolist()
 
+        dat = []
+        if classification_threshold is not None:
+            print(
+                "Using ",
+                classification_threshold,
+                " for classifying ",
+                target,
+                " data.",
+            )
+            print("Converting target data into 1 and 0.")
+        all_targets = []
 
-# class CIFData(Dataset):
-#     """
-#     The CIFData dataset is a wrapper for a dataset where the crystal structures
-#     are stored in the form of CIF files. The dataset should have the following
-#     directory structure:
+        # TODO:make an all key in qm9_dgl
+        if dataset == "qm9_dgl" and target == "all":
+            print("Making all qm9_dgl")
+            tmp = []
+            for ii in d:
+                ii["all"] = [
+                    ii["mu"],
+                    ii["alpha"],
+                    ii["homo"],
+                    ii["lumo"],
+                    ii["gap"],
+                    ii["r2"],
+                    ii["zpve"],
+                    ii["U0"],
+                    ii["U"],
+                    ii["H"],
+                    ii["G"],
+                    ii["Cv"],
+                ]
+                tmp.append(ii)
+            print("Made all qm9_dgl")
+            d = tmp
+        for i in d:
+            if isinstance(i[target], list):  # multioutput target
+                all_targets.append(torch.tensor(i[target]))
+                dat.append(i)
 
-#     root_dir
-#     ├── id_prop.csv
-#     ├── atom_init.json
-#     ├── id0.cif
-#     ├── id1.cif
-#     ├── ...
+            elif (
+                i[target] is not None
+                and i[target] != "na"
+                and not math.isnan(i[target])
+            ):
+                if target_multiplication_factor is not None:
+                    i[target] = i[target] * target_multiplication_factor
+                if classification_threshold is not None:
+                    if i[target] <= classification_threshold:
+                        i[target] = 0
+                    elif i[target] > classification_threshold:
+                        i[target] = 1
+                    else:
+                        raise ValueError(
+                            "Check classification data type.",
+                            i[target],
+                            type(i[target]),
+                        )
+                dat.append(i)
+                all_targets.append(i[target])
 
-#     id_prop.csv: a CSV file with two columns. The first column recodes a
-#     unique ID for each crystal, and the second column recodes the value of
-#     target property.
+        # id_test = ids[-test_size:]
+        # if standardize:
+        #    data.setup_standardizer(id_train)
+        id_train, id_val, id_test = get_id_train_val_test(
+            total_size=len(dat),
+            split_seed=split_seed,
+            train_ratio=train_ratio,
+            val_ratio=val_ratio,
+            test_ratio=test_ratio,
+            n_train=n_train,
+            n_test=n_test,
+            n_val=n_val,
+            keep_data_order=keep_data_order,
+        )
+        ids_train_val_test = {}
+        ids_train_val_test["id_train"] = [dat[i][id_tag] for i in id_train]
+        ids_train_val_test["id_val"] = [dat[i][id_tag] for i in id_val]
+        ids_train_val_test["id_test"] = [dat[i][id_tag] for i in id_test]
+        dumpjson(
+            data=ids_train_val_test,
+            filename=os.path.join(output_dir, "ids_train_val_test.json"),
+        )
+        dataset_train = [dat[x] for x in id_train]
+        dataset_val = [dat[x] for x in id_val]
+        dataset_test = [dat[x] for x in id_test]
 
-#     atom_init.json: a JSON file that stores the initialization vector for each
-#     element.
+        if standard_scalar_and_pca:
+            y_data = [i[target] for i in dataset_train]
+            # pipe = Pipeline([('scale', StandardScaler())])
+            if not isinstance(y_data[0], list):
+                print("Running StandardScalar")
+                y_data = np.array(y_data).reshape(-1, 1)
+            sc = StandardScaler()
 
-#     ID.cif: a CIF file that recodes the crystal structure, where ID is the
-#     unique ID for the crystal.
+            sc.fit(y_data)
+            print("Mean", sc.mean_)
+            print("Variance", sc.var_)
+            try:
+                print("New max", max(y_data))
+                print("New min", min(y_data))
+            except Exception as exp:
+                print(exp)
+                pass
+            # pc = PCA(n_components=output_features)
+            # pipe = Pipeline(
+            #    [
+            #        ("scale", StandardScaler()),
+            #        ("reduce_dims", PCA(n_components=output_features)),
+            #    ]
+            # )
+            pk.dump(sc, open(os.path.join(output_dir, "sc.pkl"), "wb"))
+            # pc = PCA(n_components=10)
+            # pc.fit(y_data)
+            # pk.dump(pc, open("pca.pkl", "wb"))
 
-#     Parameters
-#     ----------
+        if classification_threshold is None:
+            try:
+                from sklearn.metrics import mean_absolute_error
 
-#     root_dir: str
-#         The path to the root directory of the dataset
-#     max_num_nbr: int
-#         The maximum number of neighbors while constructing the crystal graph
-#     radius: float
-#         The cutoff radius for searching neighbors
-#     dmin: float
-#         The minimum distance for constructing GaussianDistance
-#     step: float
-#         The step size for constructing GaussianDistance
-#     random_seed: int
-#         Random seed for shuffling the dataset
+                print("MAX val:", max(all_targets))
+                print("MIN val:", min(all_targets))
+                print("MAD:", mean_absolute_deviation(all_targets))
+                try:
+                    f = open(os.path.join(output_dir, "mad"), "w")
+                    line = "MAX val:" + str(max(all_targets)) + "\n"
+                    line += "MIN val:" + str(min(all_targets)) + "\n"
+                    line += (
+                        "MAD val:"
+                        + str(mean_absolute_deviation(all_targets))
+                        + "\n"
+                    )
+                    f.write(line)
+                    f.close()
+                except Exception as exp:
+                    print("Cannot write mad", exp)
+                    pass
+                # Random model precited value
+                x_bar = np.mean(np.array([i[target] for i in dataset_train]))
+                baseline_mae = mean_absolute_error(
+                    np.array([i[target] for i in dataset_test]),
+                    np.array([x_bar for i in dataset_test]),
+                )
+                print("Baseline MAE:", baseline_mae)
+            except Exception as exp:
+                print("Data error", exp)
+                pass
 
-#     Returns
-#     -------
+        train_data = get_torch_dataset(
+            dataset=dataset_train,
+            id_tag=id_tag,
+            atom_features=atom_features,
+            target=target,
+            target_atomwise=target_atomwise,
+            target_grad=target_grad,
+            target_stress=target_stress,
+            neighbor_strategy=neighbor_strategy,
+            use_canonize=use_canonize,
+            name=dataset,
+            line_graph=line_graph,
+            cutoff=cutoff,
+            max_neighbors=max_neighbors,
+            classification=classification_threshold is not None,
+            output_dir=output_dir,
+            tmp_name="train_data",
+            supercell_dim=supercell_dim
+        )
+        val_data = get_torch_dataset(
+            dataset=dataset_val,
+            id_tag=id_tag,
+            atom_features=atom_features,
+            target=target,
+            target_atomwise=target_atomwise,
+            target_grad=target_grad,
+            target_stress=target_stress,
+            neighbor_strategy=neighbor_strategy,
+            use_canonize=use_canonize,
+            name=dataset,
+            line_graph=line_graph,
+            cutoff=cutoff,
+            max_neighbors=max_neighbors,
+            classification=classification_threshold is not None,
+            output_dir=output_dir,
+            tmp_name="val_data",
+            supercell_dim=supercell_dim
+        )
+        test_data = get_torch_dataset(
+            dataset=dataset_test,
+            id_tag=id_tag,
+            atom_features=atom_features,
+            target=target,
+            target_atomwise=target_atomwise,
+            target_grad=target_grad,
+            target_stress=target_stress,
+            neighbor_strategy=neighbor_strategy,
+            use_canonize=use_canonize,
+            name=dataset,
+            line_graph=line_graph,
+            cutoff=cutoff,
+            max_neighbors=max_neighbors,
+            classification=classification_threshold is not None,
+            output_dir=output_dir,
+            tmp_name="test_data",
+            supercell_dim=supercell_dim
+        )
 
-#     atom_fea: torch.Tensor shape (n_i, atom_fea_len)
-#     nbr_fea: torch.Tensor shape (n_i, M, nbr_fea_len)
-#     nbr_fea_idx: torch.LongTensor shape (n_i, M)
-#     target: torch.Tensor shape (1, )
-#     cif_id: str or int
-#     """
-#     def __init__(self, root_dir, max_num_nbr=12, radius=8, dmin=0, step=0.2,
-#                  random_seed=123):
-#         self.root_dir = root_dir
-#         self.max_num_nbr, self.radius = max_num_nbr, radius
-#         assert os.path.exists(root_dir), 'root_dir does not exist!'
-#         id_prop_file = os.path.join(self.root_dir, 'id_prop.csv')
-#         assert os.path.exists(id_prop_file), 'id_prop.csv does not exist!'
-#         with open(id_prop_file) as f:
-#             reader = csv.reader(f)
-#             self.id_prop_data = [row for row in reader]
-#         random.seed(random_seed)
-#         random.shuffle(self.id_prop_data)
-#         atom_init_file = os.path.join(self.root_dir, 'atom_init.json')
-#         assert os.path.exists(atom_init_file), 'atom_init.json does not exist!'
-#         self.ari = AtomCustomJSONInitializer(atom_init_file)
-#         self.gdf = GaussianDistance(dmin=dmin, dmax=self.radius, step=step)
+        collate_fn = train_data.collate
+        # print("line_graph,line_dih_graph", line_graph, line_dih_graph)
+        if line_graph:
+            collate_fn = train_data.collate_line_graph
 
-#     def __len__(self):
-#         return len(self.id_prop_data)
+        # use a regular pytorch dataloader
+        train_loader = DataLoader(
+            train_data,
+            batch_size=batch_size,
+            shuffle=True,
+            collate_fn=collate_fn,
+            drop_last=True,
+            num_workers=workers,
+            pin_memory=pin_memory,
+        )
 
-#     @functools.lru_cache(maxsize=None)  # Cache loaded structures
-#     def __getitem__(self, idx):
-#         cif_id, target = self.id_prop_data[idx]
-#         crystal = Structure.from_file(os.path.join(self.root_dir,
-#                                                    cif_id+'.cif'))
-#         atom_fea = np.vstack([self.ari.get_atom_fea(crystal[i].specie.number)
-#                               for i in range(len(crystal))])
-#         atom_fea = torch.Tensor(atom_fea)
-#         all_nbrs = crystal.get_all_neighbors(self.radius, include_index=True)
-#         all_nbrs = [sorted(nbrs, key=lambda x: x[1]) for nbrs in all_nbrs]
-#         nbr_fea_idx, nbr_fea = [], []
-#         for nbr in all_nbrs:
-#             if len(nbr) < self.max_num_nbr:
-#                 warnings.warn('{} not find enough neighbors to build graph. '
-#                               'If it happens frequently, consider increase '
-#                               'radius.'.format(cif_id))
-#                 nbr_fea_idx.append(list(map(lambda x: x[2], nbr)) +
-#                                    [0] * (self.max_num_nbr - len(nbr)))
-#                 nbr_fea.append(list(map(lambda x: x[1], nbr)) +
-#                                [self.radius + 1.] * (self.max_num_nbr -
-#                                                      len(nbr)))
-#             else:
-#                 nbr_fea_idx.append(list(map(lambda x: x[2],
-#                                             nbr[:self.max_num_nbr])))
-#                 nbr_fea.append(list(map(lambda x: x[1],
-#                                         nbr[:self.max_num_nbr])))
-#         nbr_fea_idx, nbr_fea = np.array(nbr_fea_idx), np.array(nbr_fea)
-#         nbr_fea = self.gdf.expand(nbr_fea)
-#         atom_fea = torch.Tensor(atom_fea)
-#         nbr_fea = torch.Tensor(nbr_fea)
-#         nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
-#         target = torch.Tensor([float(target)])
-#         return (atom_fea, nbr_fea, nbr_fea_idx), target, cif_id
+        val_loader = DataLoader(
+            val_data,
+            batch_size=batch_size,
+            shuffle=False,
+            collate_fn=collate_fn,
+            drop_last=True,
+            num_workers=workers,
+            pin_memory=pin_memory,
+        )
 
+        test_loader = DataLoader(
+            test_data,
+            batch_size=1,
+            shuffle=False,
+            collate_fn=collate_fn,
+            drop_last=False,
+            num_workers=workers,
+            pin_memory=pin_memory,
+        )
+        if save_dataloader:
+            torch.save(train_loader, train_sample)
+            torch.save(val_loader, val_sample)
+            torch.save(test_loader, test_sample)
+    print("n_train:", len(train_loader.dataset))
+    print("n_val:", len(val_loader.dataset))
+    print("n_test:", len(test_loader.dataset))
+    return (
+        train_loader,
+        val_loader,
+        test_loader,
+        train_loader.dataset.prepare_batch,
+    )
+
+def sample_train_test_val(dirname="mp_megnet_sample001",
+                          target='e_form',
+                          batchsize=64,
+                          filename="./sample/loader",
+                          save_dataloader="./sample/save_loader",
+                          output_dir="./sample/output_dir",
+                          max_neighbors=12,
+                          num_workers=8,
+                          split_seed=123,
+                          radial_cutoff=5.0,
+                          supercell_dim=[1,1,1]):
+    dataset = mp.load_json_sample(dirname,pdirname=mp.pdirname)
+    return get_train_val_loaders(dataset="megnet",
+                            dataset_array=dataset,
+                            target=target,
+                            batch_size=batchsize,
+                            filename=filename,
+                            save_dataloader=save_dataloader,
+                            output_dir=output_dir,
+                            line_graph=False,
+                            max_neighbors=max_neighbors,
+                            workers=num_workers,
+                            split_seed=split_seed,
+                            cutoff=radial_cutoff,
+                            # atom_features=,
+                            id_tag="id",
+                            supercell_dim=supercell_dim)
 
 if __name__ == "__main__":
     megnet = mp.load(down=True,downsave=True)
