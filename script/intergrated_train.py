@@ -26,7 +26,7 @@ parser.add_argument('--max_neighbors',      type=int,   default=12) # default 30
 
 parser.add_argument('--n_layers',           type=int,     default=6)
 parser.add_argument('--distance_cutoff',    type=float,   default=5.0) # SchNet default 5.0 (SchNet의 rbf의 cutoff)
-parser.add_argument('--per_atom',           type=bool,    default=False) # Loss to per atom (Not good)
+parser.add_argument('--per_atom',           type=bool,    default=False) # Make Loss to per atom Loss (Not good)
 # parser.add_argument('--supercell_dim',      type=list,    default=None)
 parser.add_argument('--supercell_dim', nargs='+', help='<Required> Set flag', default=None)
 
@@ -87,6 +87,7 @@ args['n_samples'] = None
 # from models.train_schnet import SchNetPredictor
 from dgllife.model import SchNetPredictor
 from models.schnet_periodic import SchNetPeriodicPredictor
+from models.schnet_potential import SchNetPotentialPredictor
 from models import train_schnet_like , train_alignn
 
 if config['model'] == 'SchNet':
@@ -135,6 +136,22 @@ elif config['model'] == 'SchNet_Supercell_PBC':
                             gap=0.1,
                             predictor_hidden_feats=64,
                             max_neighbor=config['max_neighbors'])
+        
+        train_schnet_like.train(args,config, model)
+        
+elif config['model'] == 'SchNet_Potential':
+        layers = []
+        for i in range(args['n_layers']):
+                layers.append(64)
+        
+        model = SchNetPotentialPredictor(node_feats=64,
+                            hidden_feats=layers,
+                            classifier_hidden_feats=64,
+                            n_tasks=1,
+                            num_node_types=100,
+                            cutoff=config['distance_cutoff'],
+                            gap=0.1,
+                            predictor_hidden_feats=64)
         
         train_schnet_like.train(args,config, model)
 
